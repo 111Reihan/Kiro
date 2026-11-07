@@ -5,6 +5,7 @@ package engine
 import (
 	"crypto/ed25519"
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -208,6 +209,12 @@ type DocVersion struct {
 
 func (e *Engine) KeyID() string {
 	return receipt.KeyID(e.key.Public().(ed25519.PublicKey))
+}
+
+// PubKey is the signing public key, base64. Hand it out so others can pin it
+// when they verify receipts.
+func (e *Engine) PubKey() string {
+	return base64.StdEncoding.EncodeToString(e.key.Public().(ed25519.PublicKey))
 }
 
 // PutDoc adds a document, or a new version of one. Old versions are never changed.

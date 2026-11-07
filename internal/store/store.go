@@ -148,6 +148,13 @@ func (s *Store) Sync() error {
 	return s.refresh()
 }
 
+// Head returns how many events are in the log and the hash of the last one.
+func (s *Store) Head() (int, string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.evs), s.last
+}
+
 // Events returns a copy of every event read so far.
 func (s *Store) Events() []Event {
 	s.mu.Lock()
