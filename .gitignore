@@ -1,0 +1,7 @@
+# runtime data (log, blobs, signing key)
+/data/
+/bin/
+*.test
+*.out
+.DS_Store
+# NOTE: never ignore .kiro/ - the hackathon requires it in the repo.
