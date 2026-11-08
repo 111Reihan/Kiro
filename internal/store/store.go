@@ -70,6 +70,9 @@ func Open(dir string) (*Store, error) {
 	return s, s.refresh()
 }
 
+// Dir is the data directory.
+func (s *Store) Dir() string { return s.dir }
+
 func (s *Store) logPath() string { return filepath.Join(s.dir, "revenant.log") }
 
 // repairTail drops a half-written last line (a crash mid-append). Only the

@@ -267,7 +267,8 @@ func init() {
 		not no never none neither nor cannot without nobody nothing nowhere
 		may might must shall should will would can could
 		all any every each some only most few many always sometimes often rarely
-		more less fewer least
+		more less fewer least within before after during until unless whenever
+		exactly maximum minimum
 		zero one two three four five six seven eight nine ten eleven twelve
 		thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty
 		thirty forty fifty sixty seventy eighty ninety hundred thousand million billion`) {
@@ -306,4 +307,25 @@ func material(o align.Op) bool {
 func startsUpper(s string) bool {
 	r, _ := utf8.DecodeRuneInString(s)
 	return unicode.IsUpper(r)
+}
+
+// Compare says how a piece of text changed between two versions: the word diff
+// (old on the quote side, new on the source side) and how much it matters.
+// changed is false when only case, punctuation or spacing differs.
+func Compare(old, cur string) (sev Severity, ops []align.Op, changed bool) {
+	words := func(s string) []string {
+		var w []string
+		for _, t := range text.Tokenize(text.Normalize(s).Runes) {
+			w = append(w, t.Text)
+		}
+		return w
+	}
+	ops = align.Diff(words(old), words(cur))
+	for _, o := range ops {
+		if o.Kind != "eq" {
+			sev = severity(ops)
+			return sev, ops, sev != Cosmetic
+		}
+	}
+	return Cosmetic, ops, false
 }

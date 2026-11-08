@@ -1,10 +1,11 @@
-// Package engine is the one place that knows what the log events mean. The
-// HTTP server, the CLI and the MCP server are thin callers of it.
+// Package engine keeps versioned documents in the hash-chained log and owns the
+// signing key. Everything else (specs, attestations) is built on top of it.
 package engine
 
 import (
 	"crypto/ed25519"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -13,29 +14,20 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
 	"sync"
 	"unicode/utf8"
 
-	"github.com/111Reihan/kiro/internal/receipt"
 	"github.com/111Reihan/kiro/internal/store"
-	"github.com/111Reihan/kiro/internal/text"
-	"github.com/111Reihan/kiro/internal/verify"
 )
 
 var (
 	ErrInvalid  = errors.New("invalid input")
 	ErrNoDoc    = errors.New("no such document or version")
 	ErrNoChange = errors.New("text is identical to the latest version")
-	ErrNoMatch  = errors.New("quote is not found in that source")
 )
 
-const (
-	MaxDocBytes   = 2 << 20
-	MaxQuoteRunes = 5000
-	MaxQuotes     = 200
-)
+const MaxDocBytes = 2 << 20
 
 var idRe = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,63}$`)
 
@@ -50,9 +42,6 @@ type Engine struct {
 
 	mu sync.Mutex // guards st
 	st state
-
-	pmu  sync.Mutex // guards prep
-	prep map[string]*verify.Prepared
 }
 
 // New opens (or creates) a data directory.
@@ -65,7 +54,7 @@ func New(dir string) (*Engine, error) {
 	if err != nil {
 		return nil, err
 	}
-	e := &Engine{St: st, key: key, prep: map[string]*verify.Prepared{}}
+	e := &Engine{St: st, key: key}
 	e.st = newState()
 	return e, nil
 }
@@ -115,17 +104,14 @@ type verData struct {
 }
 
 type state struct {
-	n      int
-	docs   map[string][]*dv
-	order  []string
-	cites  []*Cite
-	trails map[string]*Trail
-	torder []string
-	byseq  map[int]*dv
+	n     int
+	docs  map[string][]*dv
+	order []string
+	byseq map[int]*dv
 }
 
 func newState() state {
-	return state{docs: map[string][]*dv{}, trails: map[string]*Trail{}, byseq: map[int]*dv{}}
+	return state{docs: map[string][]*dv{}, byseq: map[int]*dv{}}
 }
 
 func (s *state) apply(ev store.Event) {
@@ -144,33 +130,6 @@ func (s *state) apply(ev store.Event) {
 		v := &dv{Ver: len(l) + 1, Title: d.Title, Blob: d.Blob, TS: ev.TS, Hash: ev.Hash, Seq: ev.Seq, Runes: d.Runes}
 		s.docs[d.Doc] = append(l, v)
 		s.byseq[ev.Seq] = v
-	case "cite.add":
-		var c Cite
-		if json.Unmarshal(ev.Data, &c) != nil {
-			return
-		}
-		c.ID, c.TS = "c"+strconv.Itoa(ev.Seq), ev.TS
-		s.cites = append(s.cites, &c)
-	case "trail.create":
-		var t Trail
-		if json.Unmarshal(ev.Data, &t) != nil {
-			return
-		}
-		t.ID, t.TS = "t"+strconv.Itoa(ev.Seq), ev.TS
-		s.trails[t.ID] = &t
-		s.torder = append(s.torder, t.ID)
-	case "trail.step":
-		var d struct {
-			Trail string `json:"trail"`
-			Step
-		}
-		if json.Unmarshal(ev.Data, &d) != nil {
-			return
-		}
-		if t := s.trails[d.Trail]; t != nil {
-			d.Step.TS = ev.TS
-			t.Steps = append(t.Steps, d.Step)
-		}
 	}
 }
 
@@ -207,8 +166,17 @@ type DocVersion struct {
 	TS    string `json:"ts"`
 }
 
+// KeyID is a short fingerprint of a public key. It names a key; it is not an identity.
+func KeyID(pub ed25519.PublicKey) string {
+	s := sha256.Sum256(pub)
+	return hex.EncodeToString(s[:8])
+}
+
+// Key returns the signing key, for the ledger to sign attestations with.
+func (e *Engine) Key() ed25519.PrivateKey { return e.key }
+
 func (e *Engine) KeyID() string {
-	return receipt.KeyID(e.key.Public().(ed25519.PublicKey))
+	return KeyID(e.key.Public().(ed25519.PublicKey))
 }
 
 // PubKey is the signing public key, base64. Hand it out so others can pin it
@@ -320,126 +288,6 @@ func (e *Engine) Versions(id string) ([]DocVersion, error) {
 	out := make([]DocVersion, len(l))
 	for i, v := range l {
 		out[i] = toVersion(id, v, "")
-	}
-	return out, nil
-}
-
-// prepared loads and folds one version, with a small cache keyed by blob hash.
-func (e *Engine) prepared(doc string, v *dv) (*verify.Prepared, error) {
-	e.pmu.Lock()
-	p := e.prep[v.Blob]
-	e.pmu.Unlock()
-	if p == nil {
-		b, err := e.St.GetBlob(v.Blob)
-		if err != nil {
-			return nil, err
-		}
-		p = verify.Prepare("", 0, string(b))
-		e.pmu.Lock()
-		if len(e.prep) >= 64 {
-			e.prep = map[string]*verify.Prepared{}
-		}
-		e.prep[v.Blob] = p
-		e.pmu.Unlock()
-	}
-	cp := *p
-	cp.Doc, cp.Ver = doc, v.Ver
-	return &cp, nil
-}
-
-// ---- checking ----
-
-// Scope limits which sources a quote is checked against. No docs means all of
-// them, latest version. Ver applies only when exactly one doc is named.
-type Scope struct {
-	Docs []string `json:"docs"`
-	Ver  int      `json:"ver"`
-}
-
-type target struct {
-	doc string
-	v   *dv
-}
-
-func (e *Engine) targets(sc Scope) ([]target, error) {
-	if len(sc.Docs) == 0 {
-		e.mu.Lock()
-		defer e.mu.Unlock()
-		if err := e.sync(); err != nil {
-			return nil, err
-		}
-		var out []target
-		for _, id := range e.st.order {
-			l := e.st.docs[id]
-			out = append(out, target{id, l[len(l)-1]})
-		}
-		return out, nil
-	}
-	var out []target
-	for _, id := range sc.Docs {
-		ver := 0
-		if len(sc.Docs) == 1 {
-			ver = sc.Ver
-		}
-		v, _, err := e.pick(id, ver)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, target{id, v})
-	}
-	return out, nil
-}
-
-// Check grades one quote against the scoped sources and returns the best hit.
-func (e *Engine) Check(quote string, sc Scope) (verify.Result, error) {
-	if utf8.RuneCountInString(quote) > MaxQuoteRunes {
-		return verify.Result{}, invalid("quote is over %d characters", MaxQuoteRunes)
-	}
-	ts, err := e.targets(sc)
-	if err != nil {
-		return verify.Result{}, err
-	}
-	if len(ts) == 0 {
-		return verify.Result{Verdict: verify.NoSource, Notes: []string{"no source documents are loaded"}}, nil
-	}
-	var best verify.Result
-	for i, t := range ts {
-		p, err := e.prepared(t.doc, t.v)
-		if err != nil {
-			return verify.Result{}, err
-		}
-		if r := verify.Check(quote, p); i == 0 || verify.Better(r, best) {
-			best = r
-		}
-	}
-	if best.Verdict == verify.Unsupported {
-		best.Doc, best.Ver = "", 0 // "closest source" would mislead
-	}
-	return best, nil
-}
-
-// Found is one quote found in a pasted text and how it graded.
-type Found struct {
-	text.Quote
-	Result verify.Result `json:"result"`
-}
-
-// CheckText finds every double-quoted passage in txt and grades each.
-func (e *Engine) CheckText(txt string, sc Scope) ([]Found, error) {
-	if len(txt) > MaxDocBytes {
-		return nil, invalid("text is over %d bytes", MaxDocBytes)
-	}
-	qs := text.ExtractQuotes(txt)
-	if len(qs) > MaxQuotes {
-		return nil, invalid("more than %d quotes; split the text", MaxQuotes)
-	}
-	out := make([]Found, 0, len(qs))
-	for _, q := range qs {
-		r, err := e.Check(q.Text, sc)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, Found{q, r})
 	}
 	return out, nil
 }
