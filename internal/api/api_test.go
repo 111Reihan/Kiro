@@ -311,3 +311,34 @@ func TestLoopbackHost(t *testing.T) {
 		}
 	}
 }
+
+func TestReadOnlyDemo(t *testing.T) {
+	e, err := engine.New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	ts := httptest.NewServer(Handler(e, Options{ReadOnly: true}))
+	defer ts.Close()
+	call[struct{}](t, ts, "POST", "/api/demo", struct{}{}, 200) // samples still load
+
+	quote := "Four score and seven years ago our fathers brought forth on this continent"
+	for _, c := range []struct {
+		path string
+		body any
+	}{
+		{"/api/docs", map[string]any{"id": "x", "text": "some new text here"}},
+		{"/api/cites", map[string]any{"label": "l", "doc": "gettysburg", "quote": quote}},
+		{"/api/receipts", map[string]any{"quote": quote, "doc": "gettysburg"}},
+		{"/api/trails", map[string]any{"title": "t"}},
+	} {
+		e := call[errBody](t, ts, "POST", c.path, c.body, 403)
+		if !strings.Contains(e.Error, "read-only") {
+			t.Errorf("%s: %q", c.path, e.Error)
+		}
+	}
+	call[map[string]any](t, ts, "POST", "/api/check-text", map[string]any{"text": `He said "` + quote + `" once.`}, 200)
+	call[[]engine.DocInfo](t, ts, "GET", "/api/docs", nil, 200)
+	if docs := call[[]engine.DocInfo](t, ts, "GET", "/api/docs", nil, 200); len(docs) != 2 {
+		t.Fatalf("a refused write changed the archive: %d docs", len(docs))
+	}
+}

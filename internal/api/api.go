@@ -29,7 +29,12 @@ const maxBody = 4 << 20 // a 2 MiB document plus JSON overhead
 type Options struct {
 	UI       fs.FS // served at /; nil serves no UI
 	Loopback bool  // refuse requests whose Host is not localhost, 127.0.0.1 or ::1
+	ReadOnly bool  // public demo: visitors may check text and verify receipts, nothing else writes
 }
+
+// Writes a read-only server still accepts: none of them add anything a visitor controls to the log.
+// /api/demo only loads the bundled samples and does nothing once they are loaded.
+var readOnlyOK = map[string]bool{"/api/check": true, "/api/check-text": true, "/api/receipts/verify": true, "/api/demo": true}
 
 type srv struct{ e *engine.Engine }
 
@@ -75,6 +80,10 @@ func guard(next http.Handler, o Options) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if o.Loopback && !loopbackHost(r.Host) {
 			http.Error(w, "forbidden host", http.StatusForbidden)
+			return
+		}
+		if o.ReadOnly && r.Method != http.MethodGet && r.Method != http.MethodHead && !readOnlyOK[r.URL.Path] {
+			fail(w, http.StatusForbidden, "this is a read-only demo: run Revenant locally to add sources, cite, seal receipts and build trails")
 			return
 		}
 		h := w.Header()

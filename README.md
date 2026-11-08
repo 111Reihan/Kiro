@@ -47,6 +47,14 @@ revenant audit                              # verify the hash chain and every st
 Data lives in `./data` (override with `-data` or `REVENANT_DATA`). It holds the log, the source
 texts and your signing key. The key is private; `data/` is in `.gitignore`.
 
+## Try it without installing Go
+
+Prebuilt binaries for Windows, macOS and Linux are in the release zip (`RUN-ME.txt` inside).
+`revenant serve -demo` loads the samples, so the first page already has something to check.
+
+For a public URL, see [docs/DEPLOY.md](docs/DEPLOY.md). A public instance runs with `-readonly`:
+visitors can check text and verify receipts, but cannot add sources, cite, seal or build trails.
+
 ## Receipts
 
 `revenant receipt` signs a statement of one check with Ed25519. Anyone can verify it later with

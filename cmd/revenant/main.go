@@ -18,6 +18,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/111Reihan/kiro/examples"
 	"github.com/111Reihan/kiro/internal/api"
 	"github.com/111Reihan/kiro/internal/engine"
 	"github.com/111Reihan/kiro/internal/mcp"
@@ -32,7 +33,7 @@ const usage = `revenant - check quotes against versioned sources
 
 usage: revenant <command> [flags] [arguments]      (flags go before arguments)
 
-  serve                         web app and JSON API         [-addr 127.0.0.1:8080]
+  serve                         web app and JSON API         [-addr a] [-demo] [-readonly]
   add <id> <file|->             add a source, or a new version of one   [-title t]
   check <file|->                grade every quoted passage   [-json] [-doc id]...
   receipt <quote|->             sign a receipt for a quote   -doc id [-ver n]
@@ -148,13 +149,26 @@ func (r *repeat) Set(v string) error { *r = append(*r, v); return nil }
 
 func (c cli) serve(args []string) int {
 	fs, data := c.flags("serve")
-	addr := fs.String("addr", "127.0.0.1:8080", "listen address")
+	def := "127.0.0.1:8080"
+	if port := os.Getenv("PORT"); port != "" { // hosting platforms hand the port over this way
+		def = "0.0.0.0:" + port
+	}
+	addr := fs.String("addr", def, "listen address")
+	demo := fs.Bool("demo", false, "load the bundled public-domain sources at start")
+	ro := fs.Bool("readonly", false, "public demo: only checking text and verifying receipts may write")
 	if code := c.parse(fs, args, 0, 0); code >= 0 {
 		return code
 	}
 	e, err := engine.New(*data)
 	if err != nil {
 		return c.fail(err)
+	}
+	if *demo {
+		ids, err := examples.Load(e)
+		if err != nil {
+			return c.fail(err)
+		}
+		fmt.Fprintf(c.out, "demo sources loaded: %s\n", strings.Join(ids, ", "))
 	}
 	host, _, err := net.SplitHostPort(*addr)
 	if err != nil {
@@ -166,14 +180,14 @@ func (c cli) serve(args []string) int {
 		return c.fail(err)
 	}
 	srv := &http.Server{
-		Handler:           api.Handler(e, api.Options{UI: web.FS(), Loopback: loop}),
+		Handler:           api.Handler(e, api.Options{UI: web.FS(), Loopback: loop, ReadOnly: *ro}),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      60 * time.Second,
 		IdleTimeout:       60 * time.Second,
 	}
 	fmt.Fprintf(c.out, "revenant %s on http://%s  data=%s  key=%s\n", version, ln.Addr(), *data, e.KeyID())
-	if !loop {
+	if !loop && !*ro {
 		fmt.Fprintln(c.err, "warning: listening on a non-loopback address. There is no login; anyone who can reach it can read and add sources.")
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

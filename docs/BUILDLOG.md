@@ -76,8 +76,26 @@ keyboard), zero console or CSP errors, no horizontal scroll at 375px or 1360px.
 - Spec wording was corrected against the code after review (the name rule is "one capitalised word swapped for another", not "any capital").
 - `README.md`, `docs/DEMO.md` (3-minute script), `docs/KIRO-LOG.md` (empty template), `.github/workflows/ci.yml`.
 
+## 5. Runnable prototype (this commit)
+
+The app already worked from source, but only for someone with Go installed and no public URL.
+
+- `serve -demo` loads the bundled public-domain sources at start, so a first visit shows a working page.
+- `serve -readonly` for a public instance. Only `check`, `check-text`, `receipts/verify` and the idempotent `demo` loader may POST; every other write gets 403 with a message saying to run it locally. Test: `TestReadOnlyDemo`, which also checks a refused write left the archive unchanged.
+- `serve` honours `$PORT` (binds all interfaces when set), which is how Render, Railway and similar platforms pass the port.
+- `Dockerfile`: multi-stage, static binary, distroless, non-root, `-demo -readonly`.
+- `docs/DEPLOY.md`.
+- Cross-compiled binaries for linux amd64/arm64, macOS amd64/arm64 and Windows amd64, zipped with a one-page `RUN-ME.txt`.
+
+Checked: the Linux binary from the unpacked zip runs; the exact container entrypoint
+(`PORT=… serve -demo -readonly`) serves the UI in headless Chromium, grades the sample draft
+(3 verbatim, 2 drifted, 1 unsupported) and refuses a citation with the read-only message, with no
+console errors. Not checked: the Docker image itself (no Docker daemon in this environment) and
+the macOS and Windows binaries (cross-compiled, never executed).
+
 ## What was not done
 
+- The Docker image was never built, and the macOS and Windows binaries were never run (see section 5).
 - The `.kiro/` files were written outside Kiro and have not been run in Kiro. The hooks' `askAgent` prompts and the MCP registration are untested there.
 - No third-party timestamping of receipts.
 - No URL fetching, accounts, or multi-user mode (left out on purpose).
