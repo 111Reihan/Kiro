@@ -1,0 +1,11 @@
+{
+  "enabled": true,
+  "name": "UI guardrails",
+  "description": "Keep the web UI inside the CSP and free of markup injection.",
+  "version": "1",
+  "when": { "type": "fileEdited", "patterns": ["internal/web/static/**"] },
+  "then": {
+    "type": "runCommand",
+    "command": "sh -c \"! grep -nE 'innerHTML|outerHTML|insertAdjacentHTML|document\\.write|style=|https?://' internal/web/static/app.js internal/web/static/index.html | grep -v '^[^:]*:[0-9]*:/\\*' | grep -vE 'w3.org|^internal/web/static/app.js:[0-9]+:.*//'\""
+  }
+}

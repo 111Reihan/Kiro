@@ -1,0 +1,11 @@
+{
+  "enabled": true,
+  "name": "Spec drift check",
+  "description": "Manual: compare every requirement in .kiro/specs to the tests that claim to cover it.",
+  "version": "1",
+  "when": { "type": "userTriggered" },
+  "then": {
+    "type": "askAgent",
+    "prompt": "For each requirement ID in .kiro/specs/*/requirements.md, find the test named in the matching tasks.md row. Report requirements with no test, tests that no longer exist, and tests whose assertion no longer matches the requirement wording. Do not change code; list the gaps."
+  }
+}

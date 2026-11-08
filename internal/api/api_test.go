@@ -175,9 +175,13 @@ func TestCiteEditReceiptTrail(t *testing.T) {
 	}
 
 	evs := call[[]struct {
-		Seq        int    `json:"seq"`
-		Hash, Prev string `json:"hash"`
+		Seq  int    `json:"seq"`
+		Hash string `json:"hash"`
+		Prev string `json:"prev"`
 	}](t, ts, "GET", "/api/events", nil, 200)
+	if len(evs) < 6 {
+		t.Fatalf("only %d events", len(evs))
+	}
 	for i := 1; i < len(evs); i++ {
 		if evs[i].Prev != evs[i-1].Hash || evs[i].Seq != evs[i-1].Seq+1 {
 			t.Fatalf("events do not form a chain at %d: %+v", i, evs[i-1:i+1])

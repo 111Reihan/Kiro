@@ -1,0 +1,11 @@
+{
+  "enabled": true,
+  "name": "Vet and test after Go edits",
+  "description": "Run go vet and the tests of the package that changed.",
+  "version": "1",
+  "when": { "type": "fileEdited", "patterns": ["**/*.go"] },
+  "then": {
+    "type": "askAgent",
+    "prompt": "A Go file was saved. Run `go vet ./...` and `go test -race` for the package that contains the changed file. If anything fails, fix the cause, not the test, unless the test is wrong. If a grading rule changed, confirm a property test in that package still covers it."
+  }
+}
