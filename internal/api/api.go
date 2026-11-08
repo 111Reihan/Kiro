@@ -39,6 +39,7 @@ func Handler(e *engine.Engine, o Options) http.Handler {
 	m := http.NewServeMux()
 	m.HandleFunc("GET /api/status", s.status)
 	m.HandleFunc("GET /api/audit", s.audit)
+	m.HandleFunc("GET /api/events", s.events)
 	m.HandleFunc("POST /api/demo", s.demo)
 
 	m.HandleFunc("GET /api/docs", s.docs)
@@ -205,6 +206,30 @@ func (s *srv) audit(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := s.e.St.Sync(); err == nil {
 		out["events"], out["head"] = s.e.St.Head()
+	}
+	writeJSON(w, 200, out)
+}
+
+// events lists the newest log entries (without their data) so the UI can draw the chain.
+func (s *srv) events(w http.ResponseWriter, r *http.Request) {
+	if err := s.e.St.Sync(); err != nil {
+		httpErr(w, err)
+		return
+	}
+	type row struct {
+		Seq  int    `json:"seq"`
+		TS   string `json:"ts"`
+		Type string `json:"type"`
+		Hash string `json:"hash"`
+		Prev string `json:"prev"`
+	}
+	evs := s.e.St.Events()
+	if len(evs) > 60 {
+		evs = evs[len(evs)-60:]
+	}
+	out := make([]row, len(evs))
+	for i, ev := range evs {
+		out[i] = row{ev.Seq, ev.TS, ev.Type, ev.Hash, ev.Prev}
 	}
 	writeJSON(w, 200, out)
 }

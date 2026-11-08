@@ -174,6 +174,16 @@ func TestCiteEditReceiptTrail(t *testing.T) {
 		t.Fatal("pin mismatch accepted")
 	}
 
+	evs := call[[]struct {
+		Seq        int    `json:"seq"`
+		Hash, Prev string `json:"hash"`
+	}](t, ts, "GET", "/api/events", nil, 200)
+	for i := 1; i < len(evs); i++ {
+		if evs[i].Prev != evs[i-1].Hash || evs[i].Seq != evs[i-1].Seq+1 {
+			t.Fatalf("events do not form a chain at %d: %+v", i, evs[i-1:i+1])
+		}
+	}
+
 	au := call[struct {
 		OK     bool `json:"ok"`
 		Events int  `json:"events"`
