@@ -106,6 +106,7 @@ func (f *fixture) run(js string) {
 	}
 }
 
+// covers: specter-core/2.1, specter-core/2.3, specter-core/3.1
 func TestLifecycle(t *testing.T) {
 	f := newFix(t)
 	if s := f.status("auth/1.1").Status; s != Unsealed {
@@ -159,6 +160,7 @@ func TestLifecycle(t *testing.T) {
 	}
 }
 
+// covers: specter-core/2.4
 func TestFailingBeatsStale(t *testing.T) {
 	f := newFix(t)
 	f.run(goJSON)
@@ -173,6 +175,7 @@ func TestFailingBeatsStale(t *testing.T) {
 	}
 }
 
+// covers: specter-core/2.5
 func TestOrphanAndMove(t *testing.T) {
 	f := newFix(t)
 	f.run(goJSON)
@@ -203,6 +206,7 @@ func TestOrphanAndMove(t *testing.T) {
 	}
 }
 
+// covers: specter-core/3.2, specter-core/3.3
 func TestAttestationTamper(t *testing.T) {
 	f := newFix(t)
 	f.run(goJSON)
@@ -240,6 +244,7 @@ func TestAttestationTamper(t *testing.T) {
 	}
 }
 
+// covers: specter-core/3.4
 func TestAuditCatchesLogEdit(t *testing.T) {
 	f := newFix(t)
 	f.run(goJSON)
@@ -257,7 +262,7 @@ func TestAuditCatchesLogEdit(t *testing.T) {
 	}
 	// flip a word inside the log, as someone covering their tracks would
 	dir := f.l.E.St.Dir()
-	lp := filepath.Join(dir, "revenant.log")
+	lp := filepath.Join(dir, "specter.log")
 	b, _ := os.ReadFile(lp)
 	i := strings.Index(string(b), "spec.seal")
 	if i < 0 {
@@ -295,6 +300,7 @@ func TestHistory(t *testing.T) {
 	}
 }
 
+// covers: specter-core/3.1
 func TestSealIsIdempotent(t *testing.T) {
 	f := newFix(t)
 	f.run(goJSON)

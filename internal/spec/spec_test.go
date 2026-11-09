@@ -11,6 +11,7 @@ import (
 	"github.com/111Reihan/kiro/internal/prop"
 )
 
+// covers: specter-core/1.1
 func TestParseRequirementStyles(t *testing.T) {
 	src := "# Reqs\n\n**R1** The app SHALL log in users.\n- **R2**: WHEN idle THEN the app SHALL lock.\nREQ-3: The app SHALL NOT leak keys,\n  even in logs.\n\n```\n**R9** inside a code fence\n```\n"
 	rs := ParseRequirements("auth", "auth/requirements.md", src)
@@ -29,6 +30,7 @@ func TestParseRequirementStyles(t *testing.T) {
 	}
 }
 
+// covers: specter-core/1.1
 func TestParseKiroNumbering(t *testing.T) {
 	src := "### Requirement 2\n\n1. The system SHALL a.\n2. The system SHALL b.\n\n### Requirement 3\n\n1. The system SHALL c.\n"
 	rs := ParseRequirements("x", "x.md", src)
@@ -63,6 +65,7 @@ func TestLint(t *testing.T) {
 	}
 }
 
+// covers: specter-core/1.2
 func TestParseTestsAcrossLanguages(t *testing.T) {
 	cases := []struct{ file, src, name string }{
 		{"a_test.go", "// covers: R1\nfunc TestA(t *testing.T) {\n}\n", "TestA"},
@@ -83,6 +86,7 @@ func TestParseTestsAcrossLanguages(t *testing.T) {
 	}
 }
 
+// covers: specter-core/2.3
 func TestBodyHashIgnoresComments(t *testing.T) {
 	a := ParseTests("a_test.go", "// covers: R1\nfunc TestA(t *testing.T) {\n\tx := 1\n\t_ = x\n}\n")
 	b := ParseTests("a_test.go", "// covers: R1\nfunc TestA(t *testing.T) {\n\t// a new comment\n\tx := 1\n\t_ = x\n}\n")
@@ -95,6 +99,7 @@ func TestBodyHashIgnoresComments(t *testing.T) {
 	}
 }
 
+// covers: specter-core/1.3
 func TestResults(t *testing.T) {
 	goOut := `{"Action":"run","Package":"p/a","Test":"TestX"}
 {"Action":"pass","Package":"p/a","Test":"TestX"}
@@ -129,6 +134,7 @@ func TestResults(t *testing.T) {
 	}
 }
 
+// covers: specter-core/1.2
 func TestScanResolution(t *testing.T) {
 	root := t.TempDir()
 	w := func(rel, s string) {
@@ -198,3 +204,12 @@ func errf(f string, a ...any) error { return &perr{strings.TrimSpace(fmt.Sprintf
 type perr struct{ s string }
 
 func (e *perr) Error() string { return e.s }
+
+// covers: specter-core/1.2
+func TestFixturesInRawStringsAreNotTests(t *testing.T) {
+	src := "package x\n\nconst fixture = `\n// covers: R1\nfunc TestInside(t *testing.T) {}\n`\n\n// covers: R2\nfunc TestReal(t *testing.T) {}\n"
+	ts := ParseTests("x_test.go", src)
+	if len(ts) != 1 || ts[0].Name != "TestReal" {
+		t.Fatalf("%+v", ts)
+	}
+}

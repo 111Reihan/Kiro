@@ -1,11 +1,11 @@
 {
   "enabled": true,
   "name": "UI guardrails",
-  "description": "Keep the web UI inside the CSP and free of markup injection.",
+  "description": "When UI source changes, check the rules the CSP and the design depend on.",
   "version": "1",
-  "when": { "type": "fileEdited", "patterns": ["internal/web/static/**"] },
+  "when": { "type": "fileEdited", "patterns": ["web/src/**/*.tsx", "web/src/**/*.ts", "web/src/**/*.css"] },
   "then": {
-    "type": "runCommand",
-    "command": "sh -c \"! grep -nE 'innerHTML|outerHTML|insertAdjacentHTML|document\\.write|style=|https?://' internal/web/static/app.js internal/web/static/index.html | grep -v '^[^:]*:[0-9]*:/\\*' | grep -vE 'w3.org|^internal/web/static/app.js:[0-9]+:.*//'\""
+    "type": "askAgent",
+    "prompt": "In web/src, check for: innerHTML or dangerouslySetInnerHTML, http(s):// asset URLs, any status shown by colour alone (it needs an icon and a word), animations without a prefers-reduced-motion path. Report violations with file:line. Do not rewrite anything."
   }
 }

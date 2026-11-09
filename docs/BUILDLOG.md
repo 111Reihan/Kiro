@@ -1,104 +1,43 @@
 # Build log
 
-Everything that went into this repo, in the order it was done, with the reason. Bugs that were
-found and fixed along the way are listed too, because they changed the design.
+Plain account of how this was made. Dates are the submission period (Oct 30 to Dec 4, 2026).
 
-Dates are 2026-11-07 and 2026-11-08, inside the Kiroween submission period (Oct 30 to Dec 4).
-All work in this log was done with Claude Code. Kiro sessions, if any, are recorded separately
-in [KIRO-LOG.md](KIRO-LOG.md).
+## Who wrote what
 
-## 0. The idea, and why it changed twice
+The code was written with Claude Code. The `.kiro/` files were drafted in that session, not in
+Kiro. Kiro usage, if any, is recorded by its user in [KIRO-LOG.md](KIRO-LOG.md).
 
-First pitch: a notebook with live quotes (Xanadu transclusion). Reviewed honestly, it had no clear
-user and looked like Obsidian block embeds. Second version: aim it at a real current problem,
-quotes in AI-written text that are wrong or subtly altered. A design review of that version found
-nine weaknesses; the ones that changed the build:
+## History
 
-| weakness found | what was done about it |
-|---|---|
-| "fabricated" overclaims: a quote missing from your sources is not proven fake | verdicts are `verbatim`, `drifted`, `unsupported`, `no-source`; the word "fake" appears nowhere in the product |
-| a similarity score hides meaning flips ("did" vs "did not" is 95% alike) | severity is decided by *which* words changed (negation, number, name, modal, quantifier), not by how many |
-| a signed receipt sounds like it proves more than it does | every verification prints a "not checked" list; keys can be pinned |
-| byte, UTF-16 and code point offsets disagree on accents and emoji | offsets are code points everywhere; a property test checks the folded-to-original mapping |
-| anchors by position break when text moves | citations store context and are re-located: same place, then exact search by context, then fuzzy |
-| "append-only" in a database is just a habit | hash-chained log, `audit` command, tamper tests |
-| a server that fetches URLs is an SSRF risk | no URL fetching at all; sources are pasted or uploaded |
-| "trails" were undefined | a trail is an ordered list of claims, each tied to a sealed receipt; replay re-checks them |
+1. **Revenant** (git history before the Specter commit): a quote-integrity checker. Kept the
+   hash-chained store, canonical JSON, word-level alignment, Ed25519 signing and the severity
+   rules. Dropped the product: it was a citation checker with prior art, not a new idea.
+2. **Specter**: the pivot. Reused about 80% of the backend. New: `internal/spec` (scan),
+   `internal/ledger` (status, seals, audit, history), CLI, API, demo project, and a new UI.
 
-## 1. Core engine (commit "Add core engine")
+## Decisions
 
-Was already in the working directory, uncommitted, when this phase began. I read all of it,
-built it, ran the tests with `-race`, and committed it without changes.
+- Anchor to words, not ids or line numbers; fingerprint is the folded word list.
+- `verify.Compare` treats case and punctuation as no change, so reflowing never goes stale.
+- A seal requires every covering test to have passed in the latest stored run.
+- The server cannot run commands. A what-if preview edits an in-memory copy and writes nothing,
+  which is what makes a public read-only demo safe.
+- The UI uses two 21st.dev components (animated stat card, card-frame table + badge). Its
+  free retrieval quota (2 a day) ran out, so the side sheet is hand-written in the same style.
 
-- `store`: JSONL log with a SHA-256 chain, content-addressed blobs, redaction tombstones, repair of a torn final line, a lock file so two processes cannot interleave writes.
-- `text`: folding (case, quotes, dashes, spacing) with a map back to original offsets; quote extraction.
-- `align`: word-level semi-global alignment and diff.
-- `verify`: the four verdicts and three severities.
-- `engine`: immutable document versions, citations that survive edits, "who haunts", trails.
-- `receipt`, `canon`: Ed25519 over canonical JSON; offline verification that re-grades the quote.
-- `prop`: a small seeded property-test driver, so there is no test dependency.
+## Bugs found while building
 
-## 2. API, CLI, MCP, samples (commit "Add HTTP API, CLI, MCP server")
+- Go's `regexp` has no backreferences; the JS test-name regexp panicked at start-up.
+- A `covers:` note under a one-line test attached to the wrong test. Fixed: notes inside a test
+  must be indented deeper than its declaration.
+- Fixture strings inside Go test files were read as real tests. Fixed: backtick strings skipped.
+- The drawer was unusable: it sat inside `#root`, which is made inert while it is open. Found
+  by screenshot test; fixed with a portal.
+- A case-only edit made a requirement stale. Fixed in `verify.Compare`.
 
-- `internal/api`: JSON endpoints for everything above. Guards: requests must carry a loopback `Host` (stops DNS-rebinding), POST bodies must be `application/json` (a cross-site form cannot send that), 4 MiB cap, unknown JSON fields rejected, CSP and `nosniff` on every response. Engine errors map to 400, 404, 409, 410, 422, and anything unexpected is logged and returned as a plain "internal error".
-- `internal/mcp`: stdio JSON-RPC with six tools. stdout carries protocol messages only. A tool failure is returned as a result with `isError`, so the model can read it and recover; an unknown tool is a protocol error.
-- `cmd/revenant`: `serve add check receipt verify-receipt audit key mcp version`. `check` exits 1 when any quote is not verbatim, so it works as a CI step or a git hook.
-- `examples/`: public-domain Gettysburg Address and Declaration of Independence, and a draft essay with three exact, two altered and one invented quote.
-- Two tiny accessors: `Store.Head`, `Engine.PubKey`.
+## Not done
 
-## 3. Web UI (commit "Add candlelit web UI")
-
-Design system chosen with the ui-ux-pro-max skill: editorial serif on a dark table, parchment sheet
-for the draft, ember for actions. System fonts only (the CSP forbids remote ones).
-
-- Verdicts are never colour alone: an underline style (solid, wavy, struck, dotted), an icon, and a text label, all agreeing.
-- Keyboard: every quotation is a focusable button, Enter or Space selects it. Visible focus ring, 44px targets, skip link, `aria-live` regions, reduced-motion respected, usable at 375px.
-- No `innerHTML` anywhere; all server text goes in as text nodes. A test loads a source containing `<script>` and an `<img onerror>` title and checks they stay inert.
-- Added `GET /api/events` so the Ledger view can draw the chain without shipping payloads.
-
-Checked in headless Chromium against the real binary: 14 end-to-end steps (cite, seal, trail, edit
-the source, see the drift, who-haunts, replay, audit, verify, tamper, XSS, reduced motion,
-keyboard), zero console or CSP errors, no horizontal scroll at 375px or 1360px.
-
-### Bugs found while testing the UI
-
-1. **Load sample showed nothing.** `run()` read the textarea, which was still empty, and overwrote the sample text. Fixed by filling the textarea first.
-2. **The word diff printed `[object HTMLParagraphElement]`.** `diffView` returned an array, and DOM `append` turns arrays into text. It now returns a fragment; two other call sites that passed arrays to `replaceChildren` were spread.
-3. **A toast about the last page lingered on the next.** Cleared on navigation.
-4. **A test that proved nothing.** The new events test declared `Hash, Prev string \`json:"hash"\``. Two fields with one tag are both dropped by `encoding/json`, so every value was empty and the chain assertion passed vacuously. `go vet` caught it. Fixed, and the test now also requires at least 6 events.
-
-## 4. `.kiro/`, docs, CI (this commit)
-
-- `.kiro/steering`: product (what may and may not be claimed), tech (stdlib only, CSP rules), structure (who may import whom).
-- `.kiro/specs`: three specs in EARS form with design and a task table. Every task row names a test; a script checked that all of them exist.
-- `.kiro/hooks`: check quotes when a markdown file is saved; vet and test after Go edits; a UI guardrail (no `innerHTML`, no remote URLs); a manual spec-drift check.
-- `.kiro/settings/mcp.json`: registers the MCP server.
-- Spec wording was corrected against the code after review (the name rule is "one capitalised word swapped for another", not "any capital").
-- `README.md`, `docs/DEMO.md` (3-minute script), `docs/KIRO-LOG.md` (empty template), `.github/workflows/ci.yml`.
-
-## 5. Runnable prototype (this commit)
-
-The app already worked from source, but only for someone with Go installed and no public URL.
-
-- `serve -demo` loads the bundled public-domain sources at start, so a first visit shows a working page.
-- `serve -readonly` for a public instance. Only `check`, `check-text`, `receipts/verify` and the idempotent `demo` loader may POST; every other write gets 403 with a message saying to run it locally. Test: `TestReadOnlyDemo`, which also checks a refused write left the archive unchanged.
-- `serve` honours `$PORT` (binds all interfaces when set), which is how Render, Railway and similar platforms pass the port.
-- `Dockerfile`: multi-stage, static binary, distroless, non-root, `-demo -readonly`.
-- `docs/DEPLOY.md`.
-- Cross-compiled binaries for linux amd64/arm64, macOS amd64/arm64 and Windows amd64, zipped with a one-page `RUN-ME.txt`.
-
-Checked: the Linux binary from the unpacked zip runs; the exact container entrypoint
-(`PORT=… serve -demo -readonly`) serves the UI in headless Chromium, grades the sample draft
-(3 verbatim, 2 drifted, 1 unsupported) and refuses a citation with the read-only message, with no
-console errors. Not checked: the Docker image itself (no Docker daemon in this environment) and
-the macOS and Windows binaries (cross-compiled, never executed).
-
-## What was not done
-
-- The Docker image was never built, and the macOS and Windows binaries were never run (see section 5).
-- The `.kiro/` files were written outside Kiro and have not been run in Kiro. The hooks' `askAgent` prompts and the MCP registration are untested there.
-- No third-party timestamping of receipts.
-- No URL fetching, accounts, or multi-user mode (left out on purpose).
-- Quote finding only: paraphrases and unquoted claims are not detected.
-- English-only list of meaning-changing words.
-- The demo video, the Devpost write-up, the blog post and the social post are not done and are the owner's to make.
+- MCP server for Kiro (`tasks.md` item 7).
+- Docker image and macOS/Windows binaries have not been built or run.
+- Only Go test files are dogfooded; the other language scanners are covered by unit tests only.
+- Scanning is a full walk per request; fine for repos in the thousands of files, not millions.

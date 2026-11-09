@@ -6,7 +6,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
-        with: { go-version: stable }
+        with: { go-version-file: go.mod }
       - run: test -z "$(gofmt -l .)"
       - run: go vet ./...
       - run: go test -race -count=1 ./...
+      # Specter checks its own spec: fails if a requirement or its proving test changed since it was sealed
+      - run: go run ./cmd/specter check
+  ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm ci && npm run build
+        working-directory: web
+      # the committed dist must match the source
+      - run: git diff --exit-code -- internal/web/dist

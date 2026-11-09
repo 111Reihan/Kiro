@@ -1,27 +1,34 @@
 ---
 inclusion: always
 ---
-# Revenant: product steering
+# Specter: product steering
 
-Revenant checks quotations against versioned sources and keeps the evidence. It brings back
-two unfinished ideas: Xanadu's quotes-by-reference and Memex trails.
+Specter links each requirement to the tests that prove it, anchored to the requirement's exact
+words. When the words or the tests change after sign-off, the proof is marked stale and the
+change is shown as a ghost diff. Sign-offs are Ed25519 attestations on a hash-chained log.
 
 ## Say exactly what is known
 
-- Verdicts are `verbatim`, `drifted`, `unsupported`, `no-source`. Never write "fake", "false"
-  or "fabricated" in code, UI or docs. `unsupported` means "not found in the loaded sources".
-- `drifted` carries a severity: `cosmetic`, `minor`, `material`. A change to a negation,
-  number, name or modal verb is always `material`, whatever the similarity score says.
-- A receipt proves that a key saw a source version contain a quote at a claimed time. It does
-  not prove the source is authentic or the clock is right. Every receipt lists what it did
-  not check, and the UI shows that list.
+- Statuses, worst first: `failing`, `stale`, `orphaned`, `uncovered`, `unsealed`, `verified`.
+  Never add a status without adding it to the precedence list and the UI badge map.
+- A change to a number, negation, modal verb or quantifier is `material` whatever the
+  similarity score says. Case and punctuation alone are not a change.
+- A seal proves a key signed these words, these tests and these results at a log position. It
+  does not prove the tests are good, who holds the key (pin it), or that the clock is right.
+- Never write "compliant", "certified" or "guaranteed" in code, UI or docs.
 
 ## Audience
 
-Writers, students, journalists, researchers and anyone publishing text an AI helped draft.
-The demo moment is a quote that looks right and is subtly wrong.
+Teams doing spec-driven development, including with Kiro, where the requirements file is the
+contract and an agent keeps editing code. The demo moment: change "within 2 seconds" to
+"within 5 seconds" and watch the green test turn stale.
+
+## Honest prior art
+
+Doorstop, DOORS and Jama trace requirements to tests by id. Specter adds word-level anchoring
+(drift is detected in the words, not just the id), a severity for the change, and signed,
+independently verifiable evidence.
 
 ## Tone
 
-Plain, short, concrete. No marketing words. Halloween theme lives in the visual design and in
-a few names (séance, ledger, haunts); error messages stay literal.
+Plain, short, concrete. White, quiet UI; status is never carried by colour alone.

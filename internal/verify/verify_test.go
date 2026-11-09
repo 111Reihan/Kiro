@@ -40,6 +40,7 @@ func TestClosingPunctuationIsNotDrift(t *testing.T) {
 	}
 }
 
+// covers: specter-core/2.2
 func TestNegationInsertedIsMaterial(t *testing.T) {
 	r := check("testing whether that nation, or any nation so conceived and so dedicated, can not long endure")
 	if r.Verdict != Drifted || r.Severity != Material {
@@ -47,6 +48,7 @@ func TestNegationInsertedIsMaterial(t *testing.T) {
 	}
 }
 
+// covers: specter-core/2.2
 func TestSpelledNumberChangeIsMaterial(t *testing.T) {
 	r := check("Four score and eight years ago our fathers brought forth on this continent")
 	if r.Verdict != Drifted || r.Severity != Material {
@@ -149,6 +151,7 @@ func TestPropChangedWordIsNeverVerbatim(t *testing.T) {
 	})
 }
 
+// covers: specter-core/2.2
 func TestPropInsertedNegationIsMaterial(t *testing.T) {
 	prop.Check(t, 300, func(r *rand.Rand) error {
 		words, src := randomSource(r)

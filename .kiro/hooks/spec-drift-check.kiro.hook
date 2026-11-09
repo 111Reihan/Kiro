@@ -1,11 +1,11 @@
 {
   "enabled": true,
   "name": "Spec drift check",
-  "description": "Manual: compare every requirement in .kiro/specs to the tests that claim to cover it.",
+  "description": "Manual: run specter check and explain every requirement that drifted.",
   "version": "1",
   "when": { "type": "userTriggered" },
   "then": {
     "type": "askAgent",
-    "prompt": "For each requirement ID in .kiro/specs/*/requirements.md, find the test named in the matching tasks.md row. Report requirements with no test, tests that no longer exist, and tests whose assertion no longer matches the requirement wording. Do not change code; list the gaps."
+    "prompt": "Run `go run ./cmd/specter check`. For each requirement it lists, run `go run ./cmd/specter explain <id>` and tell me what changed (the ghost diff), which test is affected, and whether the code or the requirement should change. Do not edit anything; do not seal."
   }
 }

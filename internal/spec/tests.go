@@ -20,7 +20,7 @@ type Test struct {
 }
 
 var (
-	annotRe = regexp.MustCompile(`(?i)(?://|#|/\*|^\s*\*|--)\s*@?covers?\b:?\s*(.+?)\s*(?:\*/)?\s*$`)
+	annotRe = regexp.MustCompile(`(?i)^\s*(?://|#|/\*|\*|--)\s*@?covers?\b:?\s*(.+?)\s*(?:\*/)?\s*$`)
 	goDecl  = regexp.MustCompile(`^func\s+((?:Test|Fuzz)\w*)\s*\(`)
 	pyDecl  = regexp.MustCompile(`^\s*(?:async\s+)?def\s+(test\w*)\s*\(`)
 	jsDecl  = regexp.MustCompile("^\\s*(?:it|test)(?:\\.(?:only|skip))?\\(\\s*(?:'([^']+)'|\"([^\"]+)\"|`([^`]+)`)")
@@ -77,8 +77,17 @@ func ParseTests(file, src string) []Test {
 	var pending []note
 	cur := -1 // index in out of the test whose first lines still accept a note
 	curLine, curIndent := 0, 0
-	attr := -10 // line of the last @Test / #[test] attribute
+	attr := -10    // line of the last @Test / #[test] attribute
+	inRaw := false // inside a backtick string: fixtures in a test file are not tests
 	for i, ln := range lines {
+		if lang == "go" || lang == "js" {
+			odd := strings.Count(ln, "`")%2 == 1
+			if inRaw {
+				inRaw = !odd
+				continue
+			}
+			inRaw = odd
+		}
 		if m := annotRe.FindStringSubmatch(ln); m != nil {
 			ids := splitIDs(m[1])
 			if cur >= 0 && i-curLine <= 4 && indent(ln) > curIndent {

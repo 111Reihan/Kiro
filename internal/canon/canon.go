@@ -1,6 +1,6 @@
 // Package canon writes JSON the same way every time: object keys sorted,
 // no HTML escaping, no trailing newline. Hashes and signatures are taken over
-// these bytes ("revenant-canon-v1"). It is deliberately not RFC 8785; numbers
+// these bytes ("specter-canon-v1"). It is deliberately not RFC 8785; numbers
 // are only ever integers here, so the difference never shows.
 package canon
 

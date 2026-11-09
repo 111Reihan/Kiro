@@ -20,7 +20,7 @@ func seed(t *testing.T, n int) (*Store, string) {
 			t.Fatal(err)
 		}
 	}
-	return s, filepath.Join(dir, "revenant.log")
+	return s, filepath.Join(dir, "specter.log")
 }
 
 func lines(t *testing.T, p string) []string {
@@ -47,6 +47,7 @@ func TestChainHolds(t *testing.T) {
 	}
 }
 
+// covers: specter-core/3.4
 func TestChainDetectsEditDeleteSwap(t *testing.T) {
 	_, p := seed(t, 4)
 	orig := lines(t, p)

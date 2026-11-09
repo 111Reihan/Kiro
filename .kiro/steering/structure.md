@@ -1,21 +1,21 @@
 ---
 inclusion: always
 ---
-# Structure steering
+# Structure
 
 ```
-cmd/revenant     CLI entry; thin, calls the packages below
-internal/text    normalise, tokenise, extract quotes (no deps on other internal packages)
-internal/align   word alignment and diff
-internal/verify  grades a quote against text: verdict, severity, spans
-internal/canon   canonical JSON for signing
-internal/store   hash-chained log + blobs
-internal/receipt sign and verify receipts (offline: needs nothing but the receipt)
-internal/engine  documents, citations, trails; ties the above together
-internal/api     HTTP JSON + UI; internal/mcp stdio MCP; internal/web embeds the UI
-examples         public-domain sources and a sample draft
+cmd/specter        CLI and server wiring
+internal/spec      scan requirements, tasks, tests, results (reads only)
+internal/ledger    status model, seals, attestations, history, audit
+internal/engine    versioned documents + signing key
+internal/store     hash-chained log + blobs
+internal/verify    Compare: word diff and severity (the "ghost diff")
+internal/align     word-level edit distance      internal/text   folding, tokens
+internal/canon     canonical JSON                internal/prop   tiny property-test driver
+internal/api       HTTP handlers                 internal/web    embedded built UI
+internal/demo      seeded project with drift for the public instance
+web/               UI source
 ```
 
-Imports point downward only: `api`, `mcp` and `cmd` may import `engine`; `engine` may import
-`store`, `verify`, `receipt`; `verify` imports `align` and `text`. `receipt` must never import
-`engine` or `store`, so verification stays possible without the original install.
+Imports flow downward: `api` -> `ledger` -> `engine` -> `store`; `spec` imports nothing local
+except `text`. `spec` never writes. `api` never imports `os/exec`.

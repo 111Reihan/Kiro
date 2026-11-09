@@ -73,7 +73,7 @@ func Open(dir string) (*Store, error) {
 // Dir is the data directory.
 func (s *Store) Dir() string { return s.dir }
 
-func (s *Store) logPath() string { return filepath.Join(s.dir, "revenant.log") }
+func (s *Store) logPath() string { return filepath.Join(s.dir, "specter.log") }
 
 // repairTail drops a half-written last line (a crash mid-append). Only the
 // fragment after the final newline is removed; a complete line is never touched.
@@ -220,7 +220,7 @@ func (s *Store) Append(typ string, data any) (Event, error) {
 // shortcut: a crashed holder leaves the file behind; it is treated as stale
 // after 30s. Upgrade to flock/LockFileEx if writers ever run on one hot path.
 func (s *Store) lock() (func(), error) {
-	p := filepath.Join(s.dir, "revenant.lock")
+	p := filepath.Join(s.dir, "specter.lock")
 	deadline := time.Now().Add(10 * time.Second)
 	for {
 		f, err := os.OpenFile(p, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)

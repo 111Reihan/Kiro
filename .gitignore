@@ -5,3 +5,6 @@
 *.out
 .DS_Store
 # NOTE: never ignore .kiro/ - the hackathon requires it in the repo.
+
+web/node_modules/
+.specter/key.ed25519

@@ -1,0 +1,11 @@
+{
+  "enabled": true,
+  "name": "Requirements saved",
+  "description": "When a requirements.md is saved, show which proofs just went stale.",
+  "version": "1",
+  "when": { "type": "fileEdited", "patterns": ["**/requirements.md"] },
+  "then": {
+    "type": "askAgent",
+    "prompt": "A requirements file changed. Run `go run ./cmd/specter check` and report only the requirements whose status is stale, with the ghost diff. If a change is material, say so first."
+  }
+}
